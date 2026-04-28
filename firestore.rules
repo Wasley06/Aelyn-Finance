@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // AUTH HELPERS
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ENTITY VALIDATIONS
+
+    function isValidUser(data) {
+      let keys = data.keys();
+      return keys.hasAll(['uid', 'email', 'role', 'displayName']) &&
+             keys.size() >= 4 && keys.size() <= 7 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             data.role in ['stakeholder', 'admin'] &&
+             (keys.hasAny(['photoURL']) ? data.photoURL is string && data.photoURL.size() <= 1048576 : true) &&
+             (keys.hasAny(['currency']) ? data.currency is string && data.currency.size() <= 10 : true) &&
+             (keys.hasAny(['isDeveloperMode']) ? data.isDeveloperMode is bool : true);
+    }
+
+    function isValidNotification(data) {
+      let keys = data.keys();
+      return keys.hasAll(['message', 'type', 'timestamp', 'readBy']) &&
+             keys.size() == 4 &&
+             data.message is string && data.message.size() <= 1000 &&
+             data.type in ['entry', 'debt', 'system'] &&
+             data.readBy is list;
+    }
+
+    function isValidEntry(data) {
+      return data.keys().hasAll(['amount', 'category', 'date', 'description', 'userId', 'userName', 'createdAt']) &&
+             data.keys().size() == 7 &&
+             data.amount is number && data.amount > 0 &&
+             data.category in ['income', 'expense'] &&
+             data.date is string && 
+             data.description is string && data.description.size() <= 1000 &&
+             data.userId == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isValidDebt(data) {
+      return data.keys().hasAll(['amount', 'description', 'date', 'status', 'userId', 'createdAt']) &&
+             data.keys().size() == 6 &&
+             data.amount is number && data.amount > 0 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.status in ['Paid', 'Unpaid'] &&
+             data.userId == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isValidLog(data) {
+      return data.keys().hasAll(['userId', 'userName', 'action', 'timestamp', 'targetCollection', 'targetId', 'before', 'after']) &&
+             data.keys().size() == 8 &&
+             data.userId == request.auth.uid &&
+             data.timestamp == request.time;
+    }
+
+    // MATCH BLOCKS
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && isValidUser(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'currency']);
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidNotification(incoming());
+      allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['readBy']);
+    }
+
+    match /entries/{entryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidEntry(incoming());
+      allow update: if (isSignedIn() && isValidEntry(incoming()) && 
+                    existing().userId == request.auth.uid &&
+                    incoming().userId == existing().userId) || isAdmin();
+      allow delete: if (isSignedIn() && existing().userId == request.auth.uid) || isAdmin();
+    }
+
+    match /debts/{debtId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidDebt(incoming());
+      allow update: if (isSignedIn() && (
+        (existing().userId == request.auth.uid && isValidDebt(incoming())) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status'])) // Anyone can mark as paid
+      )) || isAdmin();
+      allow delete: if (isSignedIn() && existing().userId == request.auth.uid) || isAdmin();
+    }
+
+    match /logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidLog(incoming());
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+  }
+}

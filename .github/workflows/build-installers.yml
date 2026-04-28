@@ -1,0 +1,38 @@
+name: Build installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aelyn-Finance-Windows
+          path: release/**
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run desktop:dist:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aelyn-Finance-macOS
+          path: release/**
+

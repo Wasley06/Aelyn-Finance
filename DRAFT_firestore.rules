@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // AUTH HELPERS
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ENTITY VALIDATIONS
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.keys().size() == 3 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             data.role == 'stakeholder';
+    }
+
+    function isValidEntry(data) {
+      return data.keys().hasAll(['amount', 'category', 'date', 'description', 'userId', 'userName', 'createdAt']) &&
+             data.keys().size() == 7 &&
+             data.amount is number && data.amount > 0 &&
+             data.category in ['income', 'expense'] &&
+             data.date is string && // Simplified for now, real-time-and-multi-user might want more
+             data.description is string && data.description.size() <= 1000 &&
+             data.userId == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isValidDebt(data) {
+      return data.keys().hasAll(['amount', 'description', 'date', 'status', 'userId', 'createdAt']) &&
+             data.keys().size() == 6 &&
+             data.amount is number && data.amount > 0 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.status in ['Paid', 'Unpaid'] &&
+             data.userId == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isValidLog(data) {
+      return data.keys().hasAll(['userId', 'userName', 'action', 'timestamp', 'targetCollection', 'targetId', 'before', 'after']) &&
+             data.keys().size() == 8 &&
+             data.userId == request.auth.uid &&
+             data.timestamp == request.time;
+    }
+
+    // MATCH BLOCKS
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if false; // Users shouldn't list each other
+      allow create: if isSignedIn() && isValidUser(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName']);
+    }
+
+    match /entries/{entryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidEntry(incoming());
+      allow update: if isSignedIn() && isValidEntry(incoming()) && (
+        incoming().userId == existing().userId || // Owner can update
+        false // No special actions for now
+      );
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /debts/{debtId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidDebt(incoming());
+      allow update: if isSignedIn() && isValidDebt(incoming()) && (
+        incoming().userId == existing().userId ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']) // Anyone can potentially mark as paid? No, only stakeholders.
+      );
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidLog(incoming());
+      allow update, delete: if false; // Logs are immutable
+    }
+  }
+}

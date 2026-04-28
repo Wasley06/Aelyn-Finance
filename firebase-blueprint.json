@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user (Stakeholder)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["stakeholder", "admin"] },
+        "isDeveloperMode": { "type": "boolean" },
+        "currency": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Entry": {
+      "title": "Entry",
+      "description": "Financial income or expense record",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "category": { "type": "string", "enum": ["income", "expense"] },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["amount", "category", "date", "description", "userId", "userName", "createdAt"]
+    },
+    "Debt": {
+      "title": "Debt",
+      "description": "Debt record split between stakeholders",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Paid", "Unpaid"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["amount", "description", "date", "status", "userId", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit log for all changes",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "before": { "type": "object" },
+        "after": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "targetCollection": { "type": "string" },
+        "targetId": { "type": "string" }
+      },
+      "required": ["userId", "userName", "action", "timestamp", "targetCollection", "targetId"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Real-time alerts",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "readBy": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "entries": {
+      "schema": "Entry",
+      "description": "Financial transactions"
+    },
+    "debts": {
+      "schema": "Debt",
+      "description": "Debt records"
+    },
+    "logs": {
+      "schema": "ActivityLog",
+      "description": "Audit trails"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "System notifications"
+    }
+  }
+}
