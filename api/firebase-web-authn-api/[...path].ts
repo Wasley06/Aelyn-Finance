@@ -20,16 +20,23 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const targetUrl = `${base}${req.url || ''}`.replace(/\/\?/g, '?');
+  const pathParam = req.query?.path;
+  const extraPath =
+    typeof pathParam === 'string'
+      ? `/${pathParam}`
+      : Array.isArray(pathParam) && pathParam.length
+        ? `/${pathParam.join('/')}`
+        : '';
 
-  // Forward request to the Firebase function (streaming response where possible).
+  const incoming = new URL(req.url || '/', 'http://localhost');
+  const targetUrl = `${base}${extraPath}${incoming.search || ''}`;
+
   const headers = new Headers();
-  for (const [k, v] of Object.entries(req.headers)) {
+  for (const [k, v] of Object.entries(req.headers || {})) {
     if (typeof v === 'undefined') continue;
     if (Array.isArray(v)) headers.set(k, v.join(','));
     else headers.set(k, String(v));
   }
-  // Host must be re-written by fetch.
   headers.delete('host');
 
   const init: RequestInit = {
@@ -52,3 +59,4 @@ export default async function handler(req: any, res: any) {
     res.status(502).json({ error: e?.message || 'Upstream request failed.' });
   }
 }
+

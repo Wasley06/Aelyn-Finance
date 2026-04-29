@@ -1,6 +1,5 @@
 {
   "rewrites": [
-    { "source": "/firebase-web-authn-api", "destination": "/api/firebase-web-authn-api" }
+    { "source": "/firebase-web-authn-api/:path*", "destination": "/api/firebase-web-authn-api/:path*" }
   ]
 }
-
