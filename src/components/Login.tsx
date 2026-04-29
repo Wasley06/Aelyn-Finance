@@ -298,6 +298,10 @@ export default function Login() {
           </button>
         </div>
 
+        <p className="mt-3 text-center text-[11px] text-slate-500 leading-snug">
+          Biometric unlock works after a one-time sign-in on this device (and enabling biometrics in Profile).
+        </p>
+
         <p className="mt-8 text-center text-[12px] text-slate-500">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <button onClick={() => setIsSignUp(!isSignUp)} className="text-sky hover:underline font-semibold" type="button">
