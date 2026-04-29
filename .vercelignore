@@ -1,0 +1,11 @@
+# Keep Vercel uploads small (Vercel rebuilds dependencies remotely)
+node_modules
+dist
+release
+repo
+.git
+.vercel
+
+# Large design references (not needed in production)
+src/assets/ui-mock.png
+

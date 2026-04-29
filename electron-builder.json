@@ -1,0 +1,40 @@
+{
+  "appId": "com.aelyn.finance",
+  "productName": "Aelyn Finance",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**",
+    "electron/**",
+    "resources/**",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "resources/aelyn-logo.png",
+      "to": "resources/aelyn-logo.png"
+    }
+  ],
+  "asar": true,
+  "win": {
+    "target": [
+      "nsis",
+      "zip"
+    ],
+    "icon": "resources/aelyn-logo.png"
+  },
+  "mac": {
+    "target": [
+      "dmg"
+    ],
+    "icon": "resources/aelyn-logo.png",
+    "category": "public.app-category.finance"
+  },
+  "linux": {
+    "target": [
+      "AppImage"
+    ],
+    "category": "Finance"
+  }
+}
