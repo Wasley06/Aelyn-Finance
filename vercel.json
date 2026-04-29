@@ -1,13 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/**/*.ts", "use": "@vercel/node" },
-    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
-  ],
-  "routes": [
-    { "src": "^/firebase-web-authn-api/?$", "dest": "/api/firebase-web-authn-api" },
-    { "src": "^/firebase-web-authn-api/(.*)$", "dest": "/api/firebase-web-authn-api/$1" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

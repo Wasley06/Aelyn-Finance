@@ -8,12 +8,12 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
 } from 'firebase/auth';
-import { auth, functions } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import { LogIn, Mail, Lock, AlertCircle, Fingerprint, ArrowRight, Sun, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
 import aelynLogo from '../assets/aelyn-logo.png';
 import { useTheme } from '../contexts/ThemeContext';
-import { signInWithBiometrics } from '../lib/biometrics';
+import { biometricUnlock, isBiometricsEnabled } from '../lib/biometrics';
 
 export default function Login() {
   const { mode, toggle } = useTheme();
@@ -23,6 +23,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
+  const existingUser = auth.currentUser;
   const [recentAccounts, setRecentAccounts] = useState<{ label: string; at: number }[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('aelyn.recentAccounts') || '[]');
@@ -78,8 +79,16 @@ export default function Login() {
     setBusy(true);
     try {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-      const cred = await signInWithBiometrics(auth, functions);
-      addRecentAccount(cred.user.email || cred.user.displayName || 'Passkey user');
+      const uid = auth.currentUser?.uid || existingUser?.uid;
+      if (!uid) {
+        throw new Error('Sign in once (email/Google) to enable biometrics on this device.');
+      }
+      if (!isBiometricsEnabled(uid)) {
+        throw new Error('Biometrics not enabled for this account on this device. Enable it in Profile.');
+      }
+      await biometricUnlock(uid);
+      // If we get here, the existing session is confirmed; App will route to dashboard.
+      addRecentAccount(auth.currentUser?.email || auth.currentUser?.displayName || 'Biometric user');
     } catch (err: any) {
       setError(err?.message || 'Biometric sign-in failed.');
     } finally {
@@ -285,7 +294,7 @@ export default function Login() {
             className="w-full bg-white/5 border border-white/10 text-slate-200 py-4 rounded-2xl font-semibold tracking-tight hover:bg-white/10 transition-all flex items-center justify-center gap-2"
           >
             <Fingerprint size={18} className="text-sky" />
-            Biometrics
+            {existingUser ? 'Unlock' : 'Biometrics'}
           </button>
         </div>
 
