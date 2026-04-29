@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Fingerprint, ArrowRight, AlertCircle } from 'lucide-react';
-import { biometricUnlock } from '../lib/biometrics';
+import { verifyBiometrics } from '../lib/biometrics';
+import { auth, functions } from '../lib/firebase';
 
 export default function BiometricUnlock({ userId, onUnlocked }: { userId: string; onUnlocked: () => void }) {
   const [error, setError] = useState<string>('');
@@ -10,7 +11,8 @@ export default function BiometricUnlock({ userId, onUnlocked }: { userId: string
     setError('');
     setBusy(true);
     try {
-      await biometricUnlock(userId);
+      // Uses FirebaseWebAuthn to verify the currently signed-in user.
+      await verifyBiometrics(auth, functions);
       onUnlocked();
     } catch (e: any) {
       setError(e?.message || 'Biometric unlock failed.');

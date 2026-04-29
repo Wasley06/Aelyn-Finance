@@ -13,7 +13,7 @@ import {
   Lock
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { db, auth } from '../lib/firebase';
+import { db, auth, functions } from '../lib/firebase';
 import { useFinance } from '../hooks/useFinance';
 import { formatCurrency, cn } from '../lib/utils';
 import { 
@@ -32,7 +32,7 @@ import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 
 import { toast } from 'sonner';
 import aelynLogo from '../assets/aelyn-logo.png';
 import { useTheme } from '../contexts/ThemeContext';
-import { disableBiometrics, enrollBiometrics, isBiometricsEnabled } from '../lib/biometrics';
+import { disableBiometrics, enableBiometrics } from '../lib/biometrics';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -1267,10 +1267,7 @@ const ProfileModal = ({ onClose, profile }: { onClose: () => void, profile: any 
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [biometricsOn, setBiometricsOn] = useState(() => {
-    const uid = auth.currentUser?.uid;
-    return uid ? isBiometricsEnabled(uid) : false;
-  });
+  const [biometricsOn, setBiometricsOn] = useState(false);
 
   const handleUpdateProfile = async () => {
     if (!auth.currentUser) return;
@@ -1314,19 +1311,18 @@ const ProfileModal = ({ onClose, profile }: { onClose: () => void, profile: any 
   };
 
   const handleToggleBiometrics = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    if (!auth.currentUser) return;
     setError('');
     setSuccess('');
     setIsUpdating(true);
     try {
       if (biometricsOn) {
-        disableBiometrics(uid);
+        await disableBiometrics(auth, functions);
         setBiometricsOn(false);
         setSuccess('Biometrics disabled');
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        await enrollBiometrics(uid);
+        await enableBiometrics(auth, functions, name || profile?.displayName || 'Aelyn User');
         setBiometricsOn(true);
         setSuccess('Biometrics enabled');
         setTimeout(() => setSuccess(''), 3000);

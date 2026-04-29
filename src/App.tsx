@@ -5,7 +5,6 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import { Toaster } from 'sonner';
 import BiometricUnlock from './components/BiometricUnlock';
-import { isBiometricsEnabled } from './lib/biometrics';
 import aelynLogo from './assets/aelyn-logo.png';
 
 function AppContent() {
@@ -40,9 +39,8 @@ function AppContent() {
   }
 
   if (user) {
-    const needsBiometric = isBiometricsEnabled(user.uid);
     const isLocked = lockedUid === user.uid;
-    if ((needsBiometric && !unlocked) || isLocked) {
+    if (isLocked) {
       return (
         <BiometricUnlock
           userId={user.uid}

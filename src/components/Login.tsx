@@ -4,12 +4,16 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { auth, functions } from '../lib/firebase';
 import { LogIn, Mail, Lock, AlertCircle, Fingerprint, ArrowRight, Sun, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
 import aelynLogo from '../assets/aelyn-logo.png';
 import { useTheme } from '../contexts/ThemeContext';
+import { signInWithBiometrics } from '../lib/biometrics';
 
 export default function Login() {
   const { mode, toggle } = useTheme();
@@ -18,27 +22,68 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [recentAccounts, setRecentAccounts] = useState<{ label: string; at: number }[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('aelyn.recentAccounts') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const addRecentAccount = (label: string) => {
+    const trimmed = (label || '').trim();
+    if (!trimmed) return;
+    const next = [{ label: trimmed, at: Date.now() }, ...recentAccounts.filter((a) => a.label !== trimmed)].slice(0, 4);
+    setRecentAccounts(next);
+    localStorage.setItem('aelyn.recentAccounts', JSON.stringify(next));
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setBusy(true);
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        addRecentAccount(cred.user.email || cred.user.displayName || email);
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        addRecentAccount(cred.user.email || cred.user.displayName || email);
       }
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    setBusy(true);
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const cred = await signInWithPopup(auth, provider);
+      addRecentAccount(cred.user.email || cred.user.displayName || 'Google user');
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      const cred = await signInWithBiometrics(auth, functions);
+      addRecentAccount(cred.user.email || cred.user.displayName || 'Passkey user');
+    } catch (err: any) {
+      setError(err?.message || 'Biometric sign-in failed.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -83,7 +128,7 @@ export default function Login() {
 
         <div className="mb-8 flex flex-col gap-2 p-4 rounded-2xl border border-white/10 bg-white/5">
           <p className="text-[10px] font-semibold uppercase text-slate-400 tracking-widest text-center mb-2">
-            Stakeholder Quick Access
+            Quick Access
           </p>
           <div className="flex gap-2">
             <button
@@ -105,6 +150,30 @@ export default function Login() {
             Requires one-time provisioning if not already active.
           </p>
         </div>
+
+        {recentAccounts.length > 0 && (
+          <div className="mb-8 flex flex-col gap-2 p-4 rounded-2xl border border-white/10 bg-white/5">
+            <p className="text-[10px] font-semibold uppercase text-slate-400 tracking-widest text-center mb-2">
+              Recent Accounts
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {recentAccounts.map((a) => (
+                <button
+                  key={a.label}
+                  type="button"
+                  onClick={handleBiometricLogin}
+                  className="px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-semibold uppercase tracking-tighter hover:border-sky/40 hover:text-sky transition-all"
+                  title="Sign in with biometrics"
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 text-center mt-1 tracking-tight">
+              Tap a name to sign in with biometrics.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleEmailAuth} className="space-y-5">
           <div>
@@ -177,10 +246,11 @@ export default function Login() {
 
           <button
             type="submit"
+            disabled={busy}
             className="w-full bg-gradient-to-r from-sky to-sky-2 text-navy py-4 rounded-2xl font-semibold tracking-tight text-sm hover:brightness-110 active:brightness-95 transition-all flex items-center justify-center gap-3 shadow-[0_20px_60px_rgba(46,229,210,0.18)]"
           >
             <LogIn size={18} className="text-navy" />
-            {isSignUp ? 'Create Account' : 'Login'}
+            {busy ? 'Please wait…' : isSignUp ? 'Create Account' : 'Login'}
             <ArrowRight size={16} className="opacity-80" />
           </button>
         </form>
@@ -198,6 +268,7 @@ export default function Login() {
           <button
             onClick={handleGoogleLogin}
             type="button"
+            disabled={busy}
             className="w-full bg-white/5 border border-white/10 text-slate-200 py-4 rounded-2xl font-semibold tracking-tight hover:bg-white/10 transition-all flex items-center justify-center gap-3 group"
           >
             <img
@@ -209,7 +280,8 @@ export default function Login() {
           </button>
           <button
             type="button"
-            onClick={() => setError('Biometrics are enabled from inside the app (Profile → Enable biometrics).')}
+            onClick={handleBiometricLogin}
+            disabled={busy}
             className="w-full bg-white/5 border border-white/10 text-slate-200 py-4 rounded-2xl font-semibold tracking-tight hover:bg-white/10 transition-all flex items-center justify-center gap-2"
           >
             <Fingerprint size={18} className="text-sky" />

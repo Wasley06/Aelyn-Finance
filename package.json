@@ -16,6 +16,7 @@
     "desktop:dist:mac": "npm run build && tsx electron/build.ts && electron-builder --config electron-builder.json --mac"
   },
   "dependencies": {
+    "@firebase-web-authn/browser": "^10.4.2",
     "@google/genai": "^1.29.0",
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.1.14",
